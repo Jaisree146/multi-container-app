@@ -4,67 +4,107 @@ const mysql = require("mysql2");
 const app = express();
 app.use(express.json());
 
-const db = mysql.createConnection({
+// CORS Middleware
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
+// MySQL Pool
+const db = mysql.createPool({
   host: "db",
   user: "root",
   password: "password",
   database: "testdb",
+  waitForConnections: true,
+  connectionLimit: 10,
 });
 
-db.connect((err) => {
-  if (err) console.log(err);
-  else console.log("MySQL Connected");
-});
+// Create table with retry
+function createTable() {
+  db.query(
+    `
+    CREATE TABLE IF NOT EXISTS tasks (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      task VARCHAR(255),
+      completed BOOLEAN DEFAULT FALSE
+    )
+  `,
+    (err) => {
+      if (err) {
+        console.log("⏳ Waiting for MySQL...");
+        setTimeout(createTable, 3000);
+      } else {
+        console.log("✅ Table ready");
+      }
+    },
+  );
+}
 
-// Create table
-db.query(`
-  CREATE TABLE IF NOT EXISTS tasks (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    task VARCHAR(255),
-    completed BOOLEAN DEFAULT FALSE
-  )
-`);
-
-// Create
+createTable();
 app.post("/add", (req, res) => {
-  const { task } = req.body;
-  db.query("INSERT INTO tasks (task) VALUES (?)", [task]);
-  res.send("Task Added");
-});
+  console.log("BODY:", req.body);
 
-// Read
+  const { task } = req.body;
+
+  if (!task) {
+    return res.status(400).send("Task missing");
+  }
+
+  db.query("INSERT INTO tasks (task) VALUES (?)", [task], (err, result) => {
+    if (err) {
+      console.log("❌ Insert Error:", err);
+      return res.status(500).send("Insert Error");
+    }
+
+    console.log("✅ Inserted:", result.insertId);
+    res.send("Added");
+  });
+});
+// READ
 app.get("/tasks", (req, res) => {
   db.query("SELECT * FROM tasks", (err, result) => {
+    if (err) return res.status(500).send("DB Error");
     res.json(result);
   });
 });
 
-// Update
+// UPDATE
 app.put("/update/:id", (req, res) => {
-  const id = req.params.id;
   const { completed } = req.body;
-
-  db.query("UPDATE tasks SET completed=? WHERE id=?", [completed, id]);
-  res.send("Updated");
+  db.query(
+    "UPDATE tasks SET completed=? WHERE id=?",
+    [completed, req.params.id],
+    (err) => {
+      if (err) return res.status(500).send("Update Error");
+      res.send("Updated");
+    },
+  );
 });
 
-// Delete
+// DELETE
 app.delete("/delete/:id", (req, res) => {
-  const id = req.params.id;
-  db.query("DELETE FROM tasks WHERE id=?", [id]);
-  res.send("Deleted");
+  db.query("DELETE FROM tasks WHERE id=?", [req.params.id], (err) => {
+    if (err) return res.status(500).send("Delete Error");
+    res.send("Deleted");
+  });
 });
 
-// Health
+// HEALTH
 app.get("/health", (req, res) => {
   res.send("OK");
 });
 
-// Home
+// HOME
 app.get("/", (req, res) => {
-  res.send("Task Manager Backend 🚀");
+  res.send("Backend Running 🚀");
 });
 
 app.listen(3000, () => {
-  console.log("Server running on port 3000");
+  console.log("🚀 Server running on port 3000");
 });

@@ -1,4 +1,7 @@
+version: "3.8"
+
 services:
+
   backend:
     build: ./backend
     container_name: backend_app
@@ -6,10 +9,12 @@ services:
       - "3000:3000"
     depends_on:
       - db
+    restart: always
 
   db:
     image: mysql:8
     container_name: mysql_db
+    restart: always
     environment:
       MYSQL_ROOT_PASSWORD: password
       MYSQL_DATABASE: testdb
