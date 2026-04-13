@@ -18,6 +18,7 @@ pipeline {
                 docker rm -f mysql_db || true
                 docker rm -f backend || true
                 docker rm -f frontend || true
+                docker rm -f grafana || true
                 '''
             }
         }
@@ -45,6 +46,8 @@ pipeline {
                 sh '''
                 echo "Listing running containers..."
                 docker ps
+                echo "Checking if Grafana is running..."
+                docker ps | grep grafana
                 '''
             }
         }

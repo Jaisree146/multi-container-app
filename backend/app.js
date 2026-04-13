@@ -1,10 +1,14 @@
 const express = require("express");
 const mysql = require("mysql2");
+const client = require("prom-client");
 
 const app = express();
 app.use(express.json());
 
-// CORS Middleware
+// ---------------- PROMETHEUS SETUP ----------------
+client.collectDefaultMetrics();
+
+// ---------------- CORS ----------------
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
@@ -15,7 +19,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// MySQL Pool
+// ---------------- MYSQL ----------------
 const db = mysql.createPool({
   host: "db",
   user: "root",
@@ -42,30 +46,24 @@ function createTable() {
       } else {
         console.log("✅ Table ready");
       }
-    },
+    }
   );
 }
-
 createTable();
+
+// ---------------- ROUTES ----------------
+
+// CREATE
 app.post("/add", (req, res) => {
-  console.log("BODY:", req.body);
-
   const { task } = req.body;
-
-  if (!task) {
-    return res.status(400).send("Task missing");
-  }
+  if (!task) return res.status(400).send("Task missing");
 
   db.query("INSERT INTO tasks (task) VALUES (?)", [task], (err, result) => {
-    if (err) {
-      console.log("❌ Insert Error:", err);
-      return res.status(500).send("Insert Error");
-    }
-
-    console.log("✅ Inserted:", result.insertId);
+    if (err) return res.status(500).send("Insert Error");
     res.send("Added");
   });
 });
+
 // READ
 app.get("/tasks", (req, res) => {
   db.query("SELECT * FROM tasks", (err, result) => {
@@ -83,7 +81,7 @@ app.put("/update/:id", (req, res) => {
     (err) => {
       if (err) return res.status(500).send("Update Error");
       res.send("Updated");
-    },
+    }
   );
 });
 
@@ -100,11 +98,18 @@ app.get("/health", (req, res) => {
   res.send("OK");
 });
 
+// ---------------- METRICS ----------------
+app.get("/metrics", async (req, res) => {
+  res.set("Content-Type", client.register.contentType);
+  res.end(await client.register.metrics());
+});
+
 // HOME
 app.get("/", (req, res) => {
   res.send("Backend Running 🚀");
 });
 
+// ---------------- SERVER ----------------
 app.listen(3000, () => {
   console.log("🚀 Server running on port 3000");
 });
