@@ -15,10 +15,6 @@ services:
     environment:
       - DOCKER_HOST=unix:///var/run/docker.sock
       - "JAVA_OPTS=-Xmx512m -Xms256m -Djenkins.install.runSetupWizard=false"
-    deploy:
-      resources:
-        limits:
-          memory: 1G
     restart: always
 
 volumes:
