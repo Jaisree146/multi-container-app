@@ -1,36 +1,61 @@
 pipeline {
     agent any
 
+    environment {
+        COMPOSE_PROJECT_NAME = "multi-container-app"
+    }
+
     stages {
 
-        stage('Clone') {
+        stage('Cleanup Old Containers') {
             steps {
-                git branch: 'main', url: 'https://github.com/Jaisree146/multi-container-app.git'
+                sh '''
+                echo "Stopping old containers..."
+                docker-compose -p $COMPOSE_PROJECT_NAME down || true
+
+                echo "Removing conflicting containers..."
+                docker rm -f prometheus || true
+                docker rm -f mysql_db || true
+                docker rm -f backend || true
+                docker rm -f frontend || true
+                '''
             }
         }
 
-        stage('Cleanup') {
+        stage('Build Images') {
             steps {
-                sh 'docker-compose -p multi-container-app down || true'
+                sh '''
+                echo "Building Docker images..."
+                docker-compose -p $COMPOSE_PROJECT_NAME build
+                '''
             }
         }
 
-        stage('Build') {
+        stage('Run Containers') {
             steps {
-                sh 'docker-compose -p multi-container-app build'
+                sh '''
+                echo "Starting containers..."
+                docker-compose -p $COMPOSE_PROJECT_NAME up -d
+                '''
             }
         }
 
-        stage('Run') {
+        stage('Verify Running Containers') {
             steps {
-                sh 'docker-compose -p multi-container-app up -d'
+                sh '''
+                echo "Listing running containers..."
+                docker ps
+                '''
             }
         }
+    }
 
-        stage('Check') {
-            steps {
-                sh 'docker ps'
-            }
+    post {
+        success {
+            echo '✅ Pipeline executed successfully!'
+        }
+        failure {
+            echo '❌ Pipeline failed! Check logs.'
         }
     }
 }
