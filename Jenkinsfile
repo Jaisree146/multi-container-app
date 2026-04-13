@@ -11,19 +11,19 @@ pipeline {
 
         stage('Cleanup') {
             steps {
-                sh 'docker-compose down || true'
+                sh 'docker-compose -p multi-container-app down || true'
             }
         }
 
         stage('Build') {
             steps {
-                sh 'docker-compose build'
+                sh 'docker-compose -p multi-container-app build'
             }
         }
 
         stage('Run') {
             steps {
-                sh 'docker-compose up -d'
+                sh 'docker-compose -p multi-container-app up -d'
             }
         }
 
